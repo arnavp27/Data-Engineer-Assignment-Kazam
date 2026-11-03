@@ -39,18 +39,20 @@ Run twice and confirm the printed counts stay the same. PostgreSQL 18 uses `127.
 
 ## Checks and results
 
-Checks cover CSV/database row counts, empty inputs, required fields, duplicate transaction IDs, matching session details under different IDs, timestamp format and order, payment references, and the summary's session total.
+I added these checks to make sure the files loaded properly and to flag records that could affect the session count:
 
-Empty extracts, missing required transaction fields, duplicate IDs or invalid start formats skip aggregation. The raw import is kept; any previous summary is not refreshed. Import failures or count mismatches roll back the run.
+- **Import counts:** I compared CSV and database row counts to catch rows missed during loading. I also checked for empty files.
+- **Required fields and timestamps:** I checked for transaction IDs, charger IDs and start times, and checked timestamp formats. These are needed to identify each record and assign it to a charger and day.
+- **Possible duplicates:** I checked for repeated transaction IDs and identical details under different IDs. I found 33 sets of matching records, containing 75 rows. These could be duplicates or separate failed attempts, like someone trying to charge three times and failing each time, so I flagged them and kept the rows pending clarification.
+- **End times:** I found 551 missing end times and 1,429 end times before their starts. I flagged these but counted the records by their start date, since the task doesn't specify only completed or successful sessions.
+- **Payment references:** I checked for payments without a matching transaction to catch missing references between the two files. This doesn't require every transaction to have a payment.
+- **Summary totals and reruns:** I checked that the summary's session counts add up to the transaction row count, and that running the pipeline twice didn't increase the counts.
 
-With the supplied files:
+With the supplied files, I loaded **200,000 transactions and 196,266 payment rows**. The summary has **32,916 charger/day rows**, adding up to **200,000 counted sessions**.
 
-- 200,000 transactions and 196,266 payment rows loaded.
-- 32,916 charger/day rows, totalling 200,000 sessions. Counts stayed unchanged across runs.
-- 551 missing end times and 1,429 end times before their starts. These records remain in the count using their recorded start date.
-- 33 groups (75 rows) match in every field except transaction ID. These are flagged as possible duplicate sessions and kept pending clarification. IDs are not altered.
+For empty inputs, missing required fields, repeated transaction IDs or invalid start formats, the current code keeps the raw import but leaves any previous summary unchanged. Import errors or count mismatches roll back the run.
 
-Status definitions and measurement units were not supplied.
+I would confirm the status meanings and measurement units before adding checks based on them, as those definitions weren't supplied.
 
 ## With more time
 
