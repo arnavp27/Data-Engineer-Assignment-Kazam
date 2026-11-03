@@ -34,25 +34,27 @@ Run twice and confirm the printed counts stay the same. PostgreSQL 18 uses `127.
 - Timestamps are integer Unix seconds. Sessions count on their start date in `Asia/Kolkata` (GMT+05:30), including sessions crossing midnight.
 - All transaction statuses are included. Payments are loaded but not joined into session counts.
 - Raw columns stay as text. The loader expects the supplied CSV column order.
+- Both supplied CSV extracts are expected to contain data.
 - Each run replaces the raw imports. Successful validation rebuilds the summary, preventing copies from accumulating across runs.
 
 ## Checks and results
 
-Checks cover CSV/database row counts, required fields, duplicate transaction IDs, timestamp format and order, payment references, and the summary's session total.
+Checks cover CSV/database row counts, empty inputs, required fields, duplicate transaction IDs, matching session details under different IDs, timestamp format and order, payment references, and the summary's session total.
 
-Missing required transaction fields, duplicate IDs or invalid start formats skip aggregation. The raw import is kept; any previous summary is not refreshed. Import failures or count mismatches roll back the run.
+Empty extracts, missing required transaction fields, duplicate IDs or invalid start formats skip aggregation. The raw import is kept; any previous summary is not refreshed. Import failures or count mismatches roll back the run.
 
 With the supplied files:
 
 - 200,000 transactions and 196,266 payment rows loaded.
 - 32,916 charger/day rows, totalling 200,000 sessions. Counts stayed unchanged across runs.
 - 551 missing end times and 1,429 end times before their starts. These records remain in the count using their recorded start date.
+- 33 groups (75 rows) match in every field except transaction ID. These are flagged as possible duplicate sessions and kept pending clarification. IDs are not altered.
 
 Status definitions and measurement units were not supplied.
 
 ## With more time
 
-I'd add tests with bad inputs and sessions around midnight, validate CSV headers, and confirm the status definitions and measurement units.
+I'd add reusable tests, validate CSV headers, and confirm the status definitions and measurement units.
 
 ## Task 2
 

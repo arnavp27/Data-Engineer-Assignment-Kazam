@@ -58,6 +58,14 @@ def load_csv(cur, filename, copy_query):
 
     print(f"Loaded {filename}")
 
+def check_nonempty_inputs(transaction_count, payment_count):
+    if transaction_count == 0:
+        print("FAIL: Transactions CSV contains no data rows.")
+    if payment_count == 0:
+        print("FAIL: Payments CSV contains no data rows.")
+
+    return transaction_count > 0 and payment_count > 0
+
 def check_missing_values(cur):
     cur.execute("""
         SELECT
@@ -96,6 +104,34 @@ def check_duplicate_transactions(cur):
         print("PASS: No repeated transaction IDs")
 
     return duplicate_count == 0
+
+def check_possible_duplicate_sessions(cur):
+    cur.execute("""
+        SELECT
+            ARRAY_AGG(DISTINCT txn_id ORDER BY txn_id) AS txn_ids,
+            COUNT(*)
+        FROM public.raw_transactions
+        WHERE txn_id IS NOT NULL AND TRIM(txn_id) <> ''
+        GROUP BY
+            connector_id, device_id, end_reason, end_time,
+            meter_start, meter_stop, org, payment_id, payment_status,
+            soc, start_time, total_capacity, total_usage, user_id, zone_id
+        HAVING COUNT(DISTINCT txn_id) > 1
+        ORDER BY txn_ids
+    """)
+    groups = cur.fetchall()
+
+    if not groups:
+        print("PASS: No matching session details under different transaction IDs")
+        return
+
+    affected_rows = sum(row_count for txn_ids, row_count in groups)
+    print(
+        f"WARNING: Possible duplicate sessions: {len(groups)} groups, "
+        f"{affected_rows} rows (warning only)"
+    )
+    for txn_ids, row_count in groups[:3]:
+        print(f"Example transaction IDs: {', '.join(txn_ids)}")
 
 def check_timestamp_format(cur):
     cur.execute("""
@@ -235,14 +271,17 @@ def main():
             """)
 
             transaction_count, payment_count = validate_raw_data(cur)
+            nonempty_inputs_ok = check_nonempty_inputs(transaction_count, payment_count)
             required_fields_ok = check_missing_values(cur)
             unique_ids_ok = check_duplicate_transactions(cur)
+            check_possible_duplicate_sessions(cur)
             start_times_ok = check_timestamp_format(cur)
             print(f"Required fields passed: {required_fields_ok}")
             check_time_order(cur)
             check_payment_references(cur)
             validation_passed = (
-                required_fields_ok and unique_ids_ok and start_times_ok
+                nonempty_inputs_ok and required_fields_ok
+                and unique_ids_ok and start_times_ok
             )
 
             print(f"Ready for aggregation: {validation_passed}")
