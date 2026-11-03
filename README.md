@@ -56,7 +56,9 @@ I would confirm the status meanings and measurement units before adding checks b
 
 ## With more time
 
-I'd add reusable tests, validate CSV headers, and confirm the status definitions and measurement units.
+Right now, I have used a full refresh of both raw tables. Each run replaces their contents with all the rows from the CSVs, then rebuilds the daily summary if validation passes. I chose this because the supplied CSVs are small enough to reload, and it keeps reruns simple while picking up changes to existing rows. For larger files updated regularly, I'd add incremental loading to process new and changed records without counting them twice. I'd need a reliable way to track updates, since these files don't have a last-updated field.
+
+I'd also add reusable tests, validate CSV headers, and confirm the status definitions and measurement units.
 
 ## Task 2
 
